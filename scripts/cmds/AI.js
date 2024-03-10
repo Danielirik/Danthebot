@@ -1,47 +1,44 @@
-const axios = require('axios');
-const fs = require('fs');
+const axios = require("axios");
 
 module.exports.config = {
-    name: "ai",
-    version: "1.0.0",
-    hasPermssion: 0,
-    credits: "Jonell Magallanes",
-    description: "EDUCATIONAL",
-    usePrefix: false,
-    commandCategory: "other",
-    usages: "[question]",
-    cooldowns: 10
+  name: "ai",
+  version: "1",
+  hasPermssion: 0,
+  credits: "Grey",
+  description: "ai",
+  commandCategory: "ai",
+  usages: "ai <ask>",
+  cooldowns: 5,
 };
 
-module.exports.run = async function ({ api, event, args }) {
-    const content = encodeURIComponent(args.join(" "));
-    const apiUrl = `https://aiapiviafastapiwithimagebyjonellmagallanes.replit.app/ai?content=${content}`;
+module.exports.run = async function({ api, event, args }) {
+  let { threadID, messageID, type, messageReply } = event;
 
-    if (!content) return api.sendMessage("Please provide your question.\n\nExample: ai what is the solar system?", event.threadID, event.messageID);
-
+  if (type === "message_reply" && messageReply.attachments[0]?.type === "photo") {
+    const attachment = messageReply.attachments[0];
+    const imageURL = attachment.url;
     try {
-        api.sendMessage("🔍 | Lee AI is searching for your answer. Please wait...", event.threadID, event.messageID);
-
-        const response = await axios.get(apiUrl);
-        const { request_count, airesponse, image_url } = response.data;
-
-        if (airesponse) {
-            api.sendMessage(`${airesponse}\n\n📝 Request Count: ${request_count}`, event.threadID, event.messageID);
-
-            if (image_url) {
-                const imagePath = './image.jpg';
-                const imageResponse = await axios.get(image_url, { responseType: 'arraybuffer' });
-                fs.writeFileSync(imagePath, Buffer.from(imageResponse.data));
-
-                api.sendMessage({ attachment: fs.createReadStream(imagePath) }, event.threadID, () => {
-                    fs.unlinkSync(imagePath); 
-                });
-            }
-        } else {
-            api.sendMessage("An error occurred while processing your request.", event.threadID);
-        }
+      const res = await axios.get(`https://api.heckerman06.repl.co/api/other/img2text?input=${encodeURIComponent(imageURL)}`);
+      const response = res.data.extractedText;
+      const resAI = await axios.get(`https://api.heckerman06.repl.co/api/other/openai-chat?newprompt=${response}`);
+      const respondAI = resAI.data.content;
+      api.sendMessage(respondAI, threadID, messageID);
     } catch (error) {
-        console.error(error);
-        api.sendMessage("🔨 | An error occurred while processing your request from API...", event.threadID);
+      api.sendMessage("Error occurred while fetching data from the API.", threadID, messageID);
     }
+  } else {
+    const response = args.join(" ");
+    if (!response) {
+      api.sendMessage("Hi! What can I do for you?", threadID, messageID);
+      return;
+    }
+  
+    try {
+      const res = await axios.get(`https://api.heckerman06.repl.co/api/other/openai-chat?newprompt=${response}`);
+      const respond = res.data.content;
+      api.sendMessage(respond, threadID, messageID);
+    } catch (error) {
+      api.sendMessage("Error occurred while fetching data from the Chatgpt API.", threadID, messageID);
+    }
+  }
 };
